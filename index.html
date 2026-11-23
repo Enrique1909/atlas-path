@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atlas Path</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a level ladder (home) and a full-screen map player; the learn list docks right on desktop, bottom on phones */
+:root{
+  --sea:#cfdde4; --sea2:#bfd1da; --land:#fbfaf6; --land-off:#ecebe4; --border:#8d9ca5; --ink:#1b2830; --muted:#55656d;
+  --panel:#ffffff; --panel2:#f3f6f7; --line:#d6dee2; --accent:#25588a; --accent-ink:#ffffff;
+  --good:#2f9c5a; --ok:#d9a92c; --miss:#d6532a; --wrong:#b8322a; --hover:#c6d8e6; --focus:#3d7fc4;
+  --range:#a9825a; --desert:#e2c27a; --river:#2f74b5; --pt:#25588a; --gold:#d9a92c;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --sea:#0e1b23; --sea2:#14262f; --land:#2b3b45; --land-off:#1f2c34; --border:#4f6473; --ink:#e5edf1; --muted:#93a5af;
+  --panel:#15232c; --panel2:#1b2b35; --line:#2a3b46; --accent:#86b6e6; --accent-ink:#0e1b23;
+  --good:#45bf78; --ok:#e5c35a; --miss:#f0763f; --wrong:#f05a4a; --hover:#3c5566; --focus:#7db7ef;
+  --range:#b08d68; --desert:#a88a4c; --river:#5aa7ea; --pt:#86b6e6; --gold:#e5c35a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --sea:#0e1b23; --sea2:#14262f; --land:#2b3b45; --land-off:#1f2c34; --border:#4f6473; --ink:#e5edf1; --muted:#93a5af;
+  --panel:#15232c; --panel2:#1b2b35; --line:#2a3b46; --accent:#86b6e6; --accent-ink:#0e1b23;
+  --good:#45bf78; --ok:#e5c35a; --miss:#f0763f; --wrong:#f05a4a; --hover:#3c5566; --focus:#7db7ef;
+  --range:#b08d68; --desert:#a88a4c; --river:#5aa7ea; --pt:#86b6e6; --gold:#e5c35a; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--panel2);color:var(--ink);font-family:var(--f-ui)}
+button,select,input{font:inherit;font-size:14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px}
+button{cursor:pointer}
+button:hover:not(:disabled),select:hover{border-color:var(--border)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+kbd{font-family:var(--f-num);font-size:11px;opacity:.7;margin-left:4px}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* ---------- home ---------- */
+#home{min-height:100%}
+.hero{background:var(--panel);border-bottom:1px solid var(--line)}
+.hero .in{max-width:1080px;margin:0 auto;padding-block:24px 20px;display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between}
+.hero h1{margin:0;font-size:32px;letter-spacing:-.01em}
+.hero p{margin:4px 0 0;color:var(--muted);max-width:56ch;line-height:1.5}
+.tally{display:flex;gap:20px;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.tally div{display:flex;flex-direction:column}
+.tally b{font-size:22px;font-weight:500}
+.tally span{font-family:var(--f-ui);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ladder{max-width:1080px;margin:0 auto;padding-block:8px 48px}
+.stage{display:grid;grid-template-columns:44px 1fr;gap:0 16px;padding-top:28px}
+.rail{display:flex;flex-direction:column;align-items:center}
+.rail .dot{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-num);font-weight:500;background:var(--panel);border:2px solid var(--accent);color:var(--accent)}
+.stage.locked .rail .dot{border-color:var(--line);color:var(--muted)}
+.stage.done .rail .dot{background:var(--accent);color:var(--accent-ink)}
+.rail .ln{flex:1;width:2px;background:var(--line);margin-top:6px}
+.stage:last-child .rail .ln{display:none}
+.shead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:12px;min-height:36px}
+.shead h2{margin:0;font-size:20px;text-wrap:balance}
+.shead .sub{color:var(--muted);font-size:14px}
+.shead .lockmsg{font-size:13px;color:var(--muted);width:100%}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;min-width:0}
+.lv{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.lv h3{margin:0;font-size:15px;line-height:1.3}
+.lv .meta{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.stars{font-size:15px;letter-spacing:2px;color:var(--line)}
+.stars .on{color:var(--gold)}
+.lv .acts{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
+.lv .acts button{padding:6px 10px;font-size:13px}
+.stage.locked .lv{opacity:.55}
+.homepick{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+.homepick select{max-width:100%}
+.datanote{margin:0 0 12px;font-size:13px;color:var(--muted);max-width:70ch;line-height:1.45}
+.datanote.verified{color:var(--good)}
+.datanote.outdated{color:var(--miss)}
+.review{margin-top:24px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px}
+.review.isdue{border-color:var(--accent)}
+.review>div{flex:1 1 260px;min-width:0}
+.review h2{margin:0;font-size:20px;text-wrap:balance}
+.review p{margin:3px 0 0;color:var(--muted);font-size:14px;line-height:1.45}
+.review dl{display:flex;gap:20px;margin:0}
+.review dl div{display:flex;flex-direction:column}
+.review dd{margin:0;font-family:var(--f-num);font-size:20px;font-variant-numeric:tabular-nums}
+.review dt{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.chips .plain{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--miss)}
+.foot{max-width:1080px;margin:0 auto;padding-block:0 32px;color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
+.footacts{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.footacts button{font-size:12px;padding:4px 8px}
+.foot label{display:flex;gap:6px;align-items:center}
+
+/* ---------- player ---------- */
+#play{position:fixed;inset:0;display:grid;grid-template-rows:auto auto 1fr;background:var(--panel2)}
+.bar{background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding-block:10px;
+  padding-top:calc(10px + env(safe-area-inset-top,0px))}
+.back{padding:6px 10px}
+.prompt{display:flex;align-items:center;gap:12px;min-width:0;flex:1 1 280px}
+.prompt .tx{display:flex;flex-direction:column;min-width:0}
+.prompt .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.prompt .name{font-size:clamp(19px,3vw,27px);font-weight:700;line-height:1.15;text-wrap:balance}
+.prompt img{height:46px;width:auto;border:1px solid var(--line);border-radius:3px;flex:none}
+.stats{display:flex;gap:12px;font-family:var(--f-num);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stats b{color:var(--ink);font-weight:500}
+.stats .g b{color:var(--good)} .stats .m b{color:var(--miss)}
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+.progress{height:4px;background:var(--line)} .progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.mapwrap{position:relative;min-height:0;overflow:hidden}
+svg#map{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.globe{fill:var(--sea);stroke:var(--border);stroke-opacity:.5;stroke-width:.8;vector-effect:non-scaling-stroke;pointer-events:none}
+.grat{fill:none;stroke:var(--border);stroke-opacity:.18;stroke-width:.5;vector-effect:non-scaling-stroke;pointer-events:none}
+.land{fill:var(--st,var(--land));stroke:var(--border);stroke-width:.6;vector-effect:non-scaling-stroke;transition:fill .25s}
+.land.off{fill:var(--st,var(--land-off))}
+.land.flat{pointer-events:none}
+.land.rgn{stroke:var(--ink);stroke-opacity:.65;stroke-width:1.6}
+.mesh{fill:none;stroke:var(--border);stroke-opacity:.35;stroke-dasharray:2 2;stroke-width:.5;vector-effect:non-scaling-stroke;pointer-events:none}
+.sea{fill:var(--st,var(--sea2));fill-opacity:.85;stroke:var(--border);stroke-opacity:.35;stroke-width:.6;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.rg{fill:var(--st,var(--range));fill-opacity:.7;stroke:var(--range);stroke-width:.6;vector-effect:non-scaling-stroke}
+.ds{fill:var(--st,var(--desert));fill-opacity:.75;stroke:var(--desert);stroke-width:.6;vector-effect:non-scaling-stroke}
+.lk{fill:var(--st,var(--river));fill-opacity:.8;stroke:var(--river);stroke-width:.6;vector-effect:non-scaling-stroke}
+.riv{fill:none;stroke:var(--st,var(--river));stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.hit{fill:none;stroke:transparent;stroke-width:14;vector-effect:non-scaling-stroke;pointer-events:stroke}
+.pt{fill:var(--st,var(--pt));stroke:var(--panel)}
+.mk{fill:var(--st,var(--land));stroke:var(--border)}
+.el{cursor:pointer}
+.el:hover{--st:var(--hover)}
+.pt.el:hover{--st:var(--focus)}
+[data-s="good"]{--st:var(--good)!important} [data-s="ok"]{--st:var(--ok)!important}
+[data-s="miss"]{--st:var(--miss)!important} [data-s="wrong"]{--st:var(--wrong)!important}
+[data-s="focus"]{--st:var(--focus)!important;animation:pulse 1.1s ease-in-out infinite}
+[data-s="reveal"]{--st:var(--miss)!important;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.4}}
+text.lab{font-family:var(--f-ui);font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-linejoin:round;text-anchor:middle;pointer-events:none}
+.toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 16px;
+  font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.15);pointer-events:none;opacity:0;transition:opacity .2s;max-width:min(560px,calc(100% - 120px));text-align:center;z-index:3}
+.toast.show{opacity:1} .toast.bad{border-color:var(--wrong)} .toast.yes{border-color:var(--good)}
+.toast small{display:block;color:var(--muted);font-size:12px}
+.zoombtns{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:12px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.zoombtns button{width:36px;height:36px;padding:0;font-size:18px;line-height:1}
+.card{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(480px,calc(100% - 32px));
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.2);z-index:3}
+.card.rev{border-left:5px solid var(--miss);display:flex;align-items:center;gap:14px}
+.card .t{flex:1;min-width:0}
+.card .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.card .v{font-size:20px;font-weight:700;line-height:1.2;display:flex;align-items:center;gap:10px}
+.card .v img{height:30px;border:1px solid var(--line);border-radius:2px}
+.card .h{font-size:13px;color:var(--muted);margin-top:2px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opts button{padding:10px;font-weight:600;min-height:48px;display:flex;align-items:center;justify-content:center}
+.opts button img{max-height:64px;max-width:100%;border:1px solid var(--line);border-radius:2px}
+.opts button.yes{border-color:var(--good);background:color-mix(in srgb,var(--good) 18%,var(--panel))}
+.opts button.no{border-color:var(--wrong);background:color-mix(in srgb,var(--wrong) 14%,var(--panel))}
+.opts.flagopts button{min-height:84px}
+.fc form{display:flex;flex-direction:column;gap:10px}
+.fc .tyrow{display:flex;gap:8px}
+.fc input{flex:1;min-width:0;font-size:17px;padding:10px 12px}
+.fc input:disabled{opacity:.7}
+.fc .tyacts{display:flex;justify-content:space-between;gap:8px}
+.fc .tyacts button:only-child{margin-left:auto}
+.tyres{border-radius:8px;padding:10px 12px;border:1px solid var(--line)}
+.tyres b{font-size:19px;display:block;line-height:1.25}
+.tyres small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.tyres.yes{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--panel))}
+.tyres.close{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,var(--panel))}
+.tyres.no{border-color:var(--miss);background:color-mix(in srgb,var(--miss) 14%,var(--panel))}
+.capdot{fill:var(--ink);stroke:var(--panel);pointer-events:none}
+.learn{position:absolute;top:0;right:0;bottom:0;width:300px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;z-index:4}
+.learn .hd{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.learn .hd p{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
+.learn ul{list-style:none;margin:0;padding:6px;overflow:auto;flex:1}
+.learn li button{width:100%;text-align:left;border:0;background:none;padding:7px 8px;display:flex;gap:10px;align-items:center;border-radius:6px}
+.learn li button:hover{background:var(--panel2)}
+.learn li img{height:18px;border:1px solid var(--line);border-radius:2px;flex:none}
+.learn li .a{color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
+.learn .ft{padding:12px 14px;border-top:1px solid var(--line);padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+.learn .ft button{width:100%}
+.withlearn .zoombtns{right:312px}
+.overlay{position:absolute;inset:0;background:color-mix(in srgb,var(--sea) 70%,transparent);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
+.summary{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;width:min(540px,100%);max-height:100%;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.summary h2{margin:0 0 4px;font-size:24px}
+.summary .bigstars{font-size:30px;letter-spacing:4px;color:var(--line)} .summary .bigstars .on{color:var(--gold)}
+.summary p{margin:0 0 12px;color:var(--muted)}
+.summary .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font-size:13px;padding:4px 10px;border-radius:999px}
+.chips button.miss{border-color:var(--miss)} .chips button.ok{border-color:var(--ok)}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);z-index:6;background:var(--sea)}
+@media (max-width:760px){
+  .learn{top:auto;left:0;width:auto;height:44%;border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0}
+  .withlearn .zoombtns{right:max(12px,env(safe-area-inset-right,0px))}
+  .stats{font-size:12px;gap:8px}
+  .hero h1{font-size:26px}
+  .stage{grid-template-columns:32px 1fr;gap:0 10px}
+  .rail .dot{width:30px;height:30px;font-size:13px}
+  .toast{max-width:calc(100% - 80px)}
+}
+@media (prefers-reduced-motion:reduce){[data-s="focus"],[data-s="reveal"]{animation:none}*{transition:none!important}}
+</style>
+
+<!-- ======================= HOME ======================= -->
+<main id="home">
+  <section class="hero gut"><div class="in">
+    <div>
+      <h1>Atlas Path</h1>
+      <p>Learn the world from the top down: continents and oceans, then regions, countries, flags, capitals and physical features. Skip any question and the map shows you the answer.</p>
+    </div>
+    <div class="tally">
+      <div><b id="tStars">0</b><span>Stars</span></div>
+      <div><b id="tLevels">0</b><span>Levels passed</span></div>
+    </div>
+  </div></section>
+  <div class="ladder gut" id="ladder"></div>
+  <div class="foot gut">
+    <span class="footacts"><label><input type="checkbox" id="unlockAll"> Unlock every stage</label><button id="resetRot">Reset map rotation</button></span>
+    <span>Map data: Natural Earth, geoBoundaries. Flags: flag-icons. <a href="credits.html">Credits</a>. <span id="saveNote">Progress is saved in this browser.</span></span>
+  </div>
+</main>
+
+<!-- ======================= PLAYER ======================= -->
+<section id="play" hidden>
+  <header class="bar gut">
+    <button class="back" id="back" aria-label="Back to levels">← Levels</button>
+    <div class="prompt" aria-live="polite">
+      <img id="pflag" alt="" hidden>
+      <div class="tx"><span class="lbl" id="lbl">Click on</span><span class="name" id="target">…</span></div>
+    </div>
+    <div class="stats"><span id="count"><b>0</b>/0</span><span class="g">✓ <b id="ng">0</b></span><span class="m">✗ <b id="nm">0</b></span></div>
+    <div class="controls">
+      <button id="skip">Skip &amp; show<kbd>S</kbd></button>
+      <button id="learnBtn">Learn</button>
+    </div>
+  </header>
+  <div class="progress"><i id="prog"></i></div>
+  <div class="mapwrap" id="wrap">
+    <svg id="map" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid meet" aria-label="Map"></svg>
+    <div class="toast" id="toast"></div>
+    <div class="zoombtns">
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zout" aria-label="Zoom out">−</button>
+      <button id="zhome" aria-label="Back to your saved view" title="Back to your saved view">⌂</button>
+      <button id="spinL" aria-label="Turn the globe west" title="Turn west (← key)">◀</button>
+      <button id="spinR" aria-label="Turn the globe east" title="Turn east (→ key)">▶</button>
+    </div>
+    <div class="card rev" id="revCard" hidden>
+      <div class="t"><div class="k" id="revK">Skipped</div><div class="v" id="revV"></div><div class="h" id="revH"></div></div>
+      <button class="primary" id="next">Next<kbd>↵</kbd></button>
+    </div>
+    <div class="card" id="mcCard" hidden><div class="opts" id="opts"></div></div>
+    <div class="card fc" id="tyCard" hidden>
+      <form id="tyForm" autocomplete="off">
+        <label class="k" for="tyIn" id="tyQ">What is the capital?</label>
+        <div class="tyrow">
+          <input id="tyIn" type="text" placeholder="Type the capital" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done">
+          <button class="primary" id="tySubmit" type="submit">Check</button>
+        </div>
+        <div class="tyres" id="tyRes" hidden></div>
+        <div class="tyacts"><button type="button" id="tyGiveUp">Show answer</button><button type="button" class="primary" id="tyNext" hidden>Next<kbd>↵</kbd></button></div>
+      </form>
+    </div>
+    <aside class="learn" id="learn" hidden>
+      <div class="hd"><strong id="learnTitle">Learn</strong><p>Tap a name to see it on the map, or tap the map to see what's there.</p>
+        <input id="learnSearch" type="search" placeholder="Filter" aria-label="Filter list"></div>
+      <ul id="learnList"></ul>
+      <div class="ft"><button class="primary" id="learnGo">Start the quiz</button></div>
+    </aside>
+    <div class="overlay" id="over" hidden>
+      <div class="summary">
+        <div class="bigstars" id="sumStars"></div>
+        <h2 id="sumh">Done</h2>
+        <p id="sump"></p>
+        <div id="sumlists"></div>
+        <div class="row">
+          <button class="primary" id="nextLevel">Next level</button>
+          <button id="practice">Practice the misses</button>
+          <button id="again">Play again</button>
+          <button id="toLevels">All levels</button>
+        </div>
+      </div>
+    </div>
+    <div class="loading" id="loading" hidden>Loading map…</div>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const W=1000,H=520;
+const S={states:{}};
+const store={get(){try{return JSON.parse(localStorage.getItem("atlasPath.v1"))||{}}catch(e){return {}}},
+  set(v){try{localStorage.setItem("atlasPath.v1",JSON.stringify(v))}catch(e){}}};
+const DEFAULT_ROT=0; // Atlantic-centred: the Americas on the left, Africa in the middle, Australia on the right
+const saved=Object.assign({prog:{},home:null,unlockAll:false,srs:{},at:0,rot:DEFAULT_ROT,levelRot:{}},store.get());
+const save=()=>{saved.at=Date.now();store.set(saved);queueCloudSave()};
+
+/* ======================= spaced repetition ======================= */
+// One card per fact: [interval days, ease, due day, times seen, times forgotten, last updated ms]
+const REVIEW_SIZE=20,MASTERED_DAYS=21;
+const today=()=>{const d=new Date();return Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5)};
+function cardId(levelId,key){
+  if(/^countries-/.test(levelId))return "country:"+key;
+  if(/^flags-/.test(levelId))return "flag:"+key;
+  if(/^capitals-/.test(levelId))return "capital:"+key;
+  if(/^home-/.test(levelId))return `${levelId}:${saved.home}:${key}`;
+  return `${levelId}:${key}`;
+}
+function parseCard(id){
+  const [a,...r]=id.split(":"),fam={country:"countries",flag:"flags",capital:"capitals"}[a];
+  if(fam){const key=r.join(":"),f=S.byCode&&S.byCode[key];return f?{level:`${fam}-${slug(f.properties.c)}`,key}:null}
+  if(/^home-/.test(a))return r[0]===saved.home?{level:a,key:r.slice(1).join(":")}:null;
+  return {level:a,key:r.join(":")};
+}
+function schedule(card,result,day,forceDue){
+  if(!card)return result==="good"?[3,2.5,day+3,1,0,Date.now()]:result==="ok"?[1,2.3,day+1,1,0,Date.now()]:[0,2.3,day,1,1,Date.now()];
+  let [iv,ease,due,seen,lapses]=card;
+  const isDue=forceDue||due<=day;
+  if(result==="miss"){iv=0;ease=Math.max(1.3,ease-.2);due=day;lapses++}
+  else if(isDue&&result==="good"){iv=iv<1?1:iv===1?3:Math.min(365,Math.round(iv*ease));ease=Math.min(3,ease+.05);due=day+iv}
+  else if(isDue){iv=Math.max(1,Math.round(iv*1.2));ease=Math.max(1.3,ease-.15);due=day+iv}
+  return [iv,+ease.toFixed(2),due,seen+1,lapses,Date.now()];
+}
+function setResult(it,r){
+  P.results[it.key]=r;
+  const id=cardId(P.level.id,it.key);saved.srs[id]=schedule(saved.srs[id],r,today(),!!P.review);save();
+}
+function reviewStats(){
+  const day=today();let due=0,tomorrow=0,learning=0,mastered=0;
+  for(const [id,c] of Object.entries(saved.srs)){
+    if(!parseCard(id))continue;
+    if(c[2]<=day)due++;else if(c[2]===day+1)tomorrow++;
+    if(c[0]>=MASTERED_DAYS)mastered++;else learning++;
+  }
+  return {due,tomorrow,learning,mastered};
+}
+
+/* private copy in the viewer's Claude account; the browser copy still works without it */
+let cloudRef=null,cloudTimer=0,cloudBusy=false,cloudAgain=false;
+function queueCloudSave(){if(!cloudRef)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(pushCloud,1500)}
+async function pushCloud(){
+  if(!cloudRef)return;if(cloudBusy){cloudAgain=true;return}
+  cloudBusy=true;
+  try{await cloudRef.set({v:1,prog:saved.prog,home:saved.home,unlockAll:saved.unlockAll,srs:saved.srs,rot:saved.rot,levelRot:saved.levelRot,at:saved.at});setSaveNote(true)}
+  catch(e){setSaveNote(false)}
+  cloudBusy=false;if(cloudAgain){cloudAgain=false;pushCloud()}
+}
+function setSaveNote(ok){const n=document.getElementById("saveNote");if(n)n.textContent=ok?"Progress is saved privately to your Claude account.":"Progress is saved in this browser."}
+function mergeCloud(d){
+  for(const [k,v] of Object.entries(d.prog||{})){const a=saved.prog[k]||{};saved.prog[k]={best:Math.max(a.best??-1,v.best??-1),stars:Math.max(a.stars||0,v.stars||0)}}
+  for(const [k,v] of Object.entries(d.srs||{}))if(!saved.srs[k]||(v[5]||0)>(saved.srs[k][5]||0))saved.srs[k]=v;
+  if((d.at||0)>(saved.at||0)){saved.home=d.home??null;saved.unlockAll=!!d.unlockAll;saved.rot=d.rot??saved.rot;saved.levelRot=d.levelRot||saved.levelRot;saved.at=d.at}
+}
+async function syncInit(){
+  try{
+    if(!window.claude)return;const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);
+    if(!db||!user)return;
+    const id=await user.id();if(!id)return;
+    const ref=db.collection("data/users/"+id).doc("learning"),snap=await ref.get();
+    if(snap.exists)mergeCloud(snap.data());
+    cloudRef=ref;store.set(saved);setSaveNote(true);if(!$("play").hidden&&P.spec&&P.spec.world&&rot0!==saved.rot){rot0=saved.rot;animateRot(rot0)}if(!$("home").hidden)renderHome();queueCloudSave();
+  }catch(e){setSaveNote(false)}
+}
+const getJSON=p=>fetch(p).then(r=>{if(!r.ok)throw new Error(p);return r.json()});
+const fmtPop=n=>n>=1e9?(n/1e9).toFixed(2)+" billion":n>=1e6?(n/1e6).toFixed(1)+" million":n>=1e3?Math.round(n/1e3)+" thousand":String(n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const flagURL=code=>S.flags&&S.flags[code]?"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(S.flags[code]):"";
+
+function largestPart(f){
+  const g=f.geometry||f;
+  if(!g||g.type!=="MultiPolygon")return f;
+  let best=null,ba=-1;for(const c of g.coordinates){const p={type:"Polygon",coordinates:c};const a=d3.geoArea(p);if(a>ba){ba=a;best=p}}
+  return {type:"Feature",geometry:best};
+}
+
+/* ======================= data ======================= */
+async function boot(){
+  const [world,phys,places,stIndex]=await Promise.all([getJSON("data/world.json"),getJSON("data/physical.json"),getJSON("data/places.json"),getJSON("data/states/index.json")]);
+  const fc=(t,o)=>topojson.feature(t,t.objects[o]).features;
+  S.countries=fc(world,"countries");S.continents=fc(world,"continents");
+  S.subregions=fc(world,"subregions").filter(f=>!/Seven seas/.test(f.properties.id));
+  S.borders=topojson.mesh(world,world.objects.countries,(a,b)=>a!==b);
+  S.byCode=Object.fromEntries(S.countries.map(f=>[f.properties.id,f]));
+  S.quiz=S.countries.filter(f=>f.properties.q).sort((a,b)=>a.properties.n.localeCompare(b.properties.n));
+  // d3 reads a ring wound the "wrong" way as the whole globe minus the shape; flip any polygon that covers more than half the Earth
+  const fixWinding=f=>{const g=f.geometry;if(!g||!/Polygon/.test(g.type))return f;
+    const polys=g.type==="Polygon"?[g.coordinates]:g.coordinates;
+    for(const p of polys)if(d3.geoArea({type:"Polygon",coordinates:p})>2*Math.PI)p.forEach(r=>r.reverse());return f};
+  for(const k of ["oceans","seas","straits","ranges","deserts","rivers","lakes"])S[k]=fc(phys,k).map(fixWinding);
+  S.meta=places.meta;S.worldCities=places.worldCities;S.peaks=places.peaks;S.volcanoes=places.volcanoes;S.stIndex=stIndex;
+  renderHome();
+  syncInit();
+  const h=location.hash.slice(1);if(h==="review")startReview();else if(h&&findLevel(h))openLevel(h,"quiz");
+}
+async function needFlags(){if(!S.flags){$("loading").hidden=false;S.flags=await getJSON("data/flags.json");$("loading").hidden=true}}
+async function needStates(code){if(!S.states[code]){$("loading").hidden=false;S.states[code]=await getJSON(`data/states/${code}.json`);$("loading").hidden=true}return S.states[code]}
+
+/* ======================= level catalogue ======================= */
+const CONTS=[["Europe","Europe"],["Africa","Africa"],["Asia","Asia"],["North America","North & Central America"],["South America","South America"],["Oceania","Oceania"]];
+const slug=s=>s.toLowerCase().replace(/&/g,"and").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const cname=code=>S.byCode[code]?S.byCode[code].properties.n:code;
+function countryFact(code){
+  const p=S.byCode[code].properties,m=S.meta[code]||{};
+  return [m.cap?`Capital: ${m.cap}`:null,p.s,p.pop?`Population ${fmtPop(p.pop)}`:null].filter(Boolean).join(" · ");
+}
+function landName(p){
+  if(p.q)return p.n;
+  const sov=(S.meta[p.id]||{}).sov;
+  return p.id==="ATA"?"Antarctica":p.n+(sov&&sov!==p.n&&!/^(Indeterminate|Kashmir|Bir Tawil)/.test(sov)?` (${sov})`:"");
+}
+const quizIn=cont=>S.quiz.filter(f=>!cont||f.properties.c===cont);
+const areaNode=(f,key,name,fact)=>({key,name,fact:fact||"",geo:f});
+
+// Each builder returns a spec the player understands.
+function specCountries(cont,flagMode){
+  const tg=quizIn(cont),tset=new Set(tg.map(f=>f.properties.id));
+  return {mode:"click",rot:cont?null:10,world:!cont,land:"countries",landEl:true,dimOthers:!!cont,targetSet:tset,needFlags:flagMode,
+    items:tg.map(f=>{const id=f.properties.id;return {key:id,q:f.properties.n,flag:flagMode?id:null,ans:f.properties.n,fact:countryFact(id),rep:f}}),
+    noun:"countries"};
+}
+function specAreas(feats,opt){
+  return Object.assign({mode:"click",land:"flat",items:feats.map(f=>({key:f.properties.id,q:f.properties.id,ans:f.properties.id,fact:opt.fact?opt.fact(f):"",rep:f}))},opt,
+    {overlay:{feats:feats.map(f=>areaNode(f,f.properties.id,f.properties.id,opt.fact?opt.fact(f):"")),cls:opt.cls,line:opt.line}});
+}
+function specPoints(pts,opt){ // pts: {key,name,ll,fact,q,ans}
+  return Object.assign({mode:"click",land:"flat",points:pts,items:pts.map(p=>({key:p.key,q:p.q||p.name,ans:p.ans||p.name,fact:p.fact||"",rep:{type:"Point",coordinates:p.ll}}))},opt);
+}
+function capitalPoints(cont){
+  return quizIn(cont).filter(f=>S.meta[f.properties.id]&&S.meta[f.properties.id].cap).map(f=>{
+    const id=f.properties.id,m=S.meta[id];
+    return {key:id,name:`${m.cap}, capital of ${f.properties.n}`,ll:m.capll,q:`Capital of ${f.properties.n}`,ans:m.cap,fact:`Capital of ${f.properties.n}`};
+  });
+}
+function capFact(code){
+  const p=S.byCode[code].properties;return [p.s,p.pop?`Population ${fmtPop(p.pop)}`:null].filter(Boolean).join(" · ");
+}
+function specFlash(cont){
+  const tg=quizIn(cont).filter(f=>S.meta[f.properties.id]&&S.meta[f.properties.id].cap);
+  return {mode:"type",rot:cont?null:10,world:!cont,land:"countries",landEl:false,dimOthers:!!cont,targetSet:new Set(tg.map(f=>f.properties.id)),
+    items:tg.map(f=>{const id=f.properties.id,m=S.meta[id];
+      return {key:id,place:f.properties.n,q:`Capital of ${f.properties.n}`,ans:m.cap,alts:m.alts||[],capll:m.capll,fact:capFact(id),rep:f}}),noun:"capitals"};
+}
+function specMC(kind){
+  const tg=quizIn(null).filter(f=>kind==="flag"?true:S.meta[f.properties.id]&&S.meta[f.properties.id].cap);
+  return {mode:"mc",mcKind:kind,world:true,rot:10,land:"countries",landEl:false,needFlags:kind==="flag",
+    items:tg.map(f=>{const id=f.properties.id;return {key:id,q:kind==="flag"?`Which is the flag of ${f.properties.n}?`:`What is the capital of ${f.properties.n}?`,
+      ans:kind==="flag"?f.properties.n:S.meta[id].cap,flagAns:kind==="flag"?id:null,fact:countryFact(id),rep:f,group:f.properties.c}}),noun:"questions"};
+}
+
+function buildStages(){
+  const stages=[
+    {id:"big",title:"The big picture",sub:"Continents and oceans",levels:[
+      {id:"continents",title:"Continents",count:7,noun:"continents",build:()=>{
+        const s=specAreas(S.continents,{world:true,rot:10,cls:"land"});s.land="none";s.overlay.cls="land";return s}},
+      {id:"oceans",title:"Oceans",count:5,noun:"oceans",build:()=>({mode:"click",world:true,rot:150,land:"flat",
+        sea:S.oceans.map(f=>areaNode(f,f.properties.id,f.properties.id)),items:S.oceans.map(f=>({key:f.properties.id,q:f.properties.id,ans:f.properties.id,rep:f}))})}
+    ]},
+    {id:"regions",title:"World regions",sub:"Middle East, Southeast Asia, the Caribbean and the rest",levels:[
+      ["Africa & Europe",["Africa","Europe"]],["Asia",["Asia"]],["the Americas & Oceania",["North America","South America","Oceania"]],["the whole world",null]
+    ].map(([t,cs])=>{const fs=()=>S.subregions.filter(f=>!cs||cs.includes(f.properties.c));
+      return {id:"regions-"+slug(t),title:"Regions of "+t,noun:"regions",count:()=>fs().length,build:()=>{
+        const f=fs();const s=specAreas(f,{world:!cs,cls:"land",fact:x=>{const n=quizIn(null).filter(c=>c.properties.s===x.properties.id).map(c=>c.properties.n);return n.length?"Includes "+n.slice(0,6).join(", ")+(n.length>6?"…":""):""}});
+        s.land="flat";s.mesh=true;s.overlay.cls="land rgn";if(cs&&cs.includes("Oceania"))s.rot=-100;return s}}})},
+    {id:"countries",title:"Countries",sub:"Every country, one continent at a time",levels:[
+      ...CONTS.map(([c,t])=>({id:"countries-"+slug(c),title:t,noun:"countries",count:()=>quizIn(c).length,build:()=>specCountries(c,false)})),
+      {id:"countries-world",title:"The whole world",noun:"countries",count:()=>S.quiz.length,build:()=>specCountries(null,false)}]},
+    {id:"flags",title:"Flags",sub:"See a flag, find its country",levels:[
+      ...CONTS.map(([c,t])=>({id:"flags-"+slug(c),title:"Flags of "+t,noun:"flags",count:()=>quizIn(c).length,needFlags:true,build:()=>specCountries(c,true)})),
+      {id:"flags-match",title:"Match the flag",noun:"questions",count:()=>S.quiz.length,needFlags:true,build:()=>specMC("flag")}]},
+    {id:"capitals",title:"Capitals & cities",sub:"Flash cards: see the country, type its capital",levels:[
+      ...CONTS.map(([c,t])=>({id:"capitals-"+slug(c),title:"Capitals of "+t,noun:"flash cards",count:()=>capitalPoints(c).length,
+        build:()=>specFlash(c)})),
+      {id:"capitals-quiz",title:"Name the capital",noun:"questions",count:()=>capitalPoints(null).length,build:()=>specMC("capital")},
+      {id:"world-cities",title:"Major world cities",noun:"cities",count:()=>S.worldCities.length,build:()=>specPoints(S.worldCities.map(([n,c,lo,la,p])=>({key:n+"|"+c,name:n,ll:[lo,la],
+        fact:`${cname(c)} · metro population about ${fmtPop(p)}`,ans:n})),{world:true,rot:10,land:"countries"})}]},
+    {id:"physical",title:"Physical world",sub:"Seas, straits, mountains, volcanoes, deserts, rivers and lakes",levels:[
+      {id:"seas",title:"Seas, gulfs & bays",noun:"seas",count:()=>S.seas.length,build:()=>({mode:"click",world:true,rot:10,land:"flat",
+        sea:S.seas.map(f=>areaNode(f,f.properties.id,f.properties.id)),items:S.seas.map(f=>({key:f.properties.id,q:f.properties.id,ans:f.properties.id,rep:f}))})},
+      {id:"straits",title:"Straits & channels",noun:"straits",count:()=>S.straits.length,build:()=>({mode:"click",world:true,rot:10,land:"flat",tinyMarkers:true,
+        sea:S.straits.map(f=>areaNode(f,f.properties.id,f.properties.id)),items:S.straits.map(f=>({key:f.properties.id,q:f.properties.id,ans:f.properties.id,rep:f}))})},
+      {id:"ranges",title:"Mountain ranges",noun:"ranges",count:()=>S.ranges.length,build:()=>specAreas(S.ranges,{world:true,rot:10,cls:"rg"})},
+      {id:"peaks",title:"Famous peaks",noun:"peaks",count:()=>S.peaks.length,build:()=>specPoints(S.peaks.map(([n,lo,la,e])=>({key:n,name:n,ll:[lo,la],fact:`${d3.format(",")(e)} m above sea level`})),{world:true,rot:10})},
+      {id:"volcanoes",title:"Volcanoes",noun:"volcanoes",count:()=>S.volcanoes.length,build:()=>specPoints(S.volcanoes.map(([n,lo,la,c])=>({key:n,name:n,ll:[lo,la],fact:c})),{world:true,rot:10})},
+      {id:"deserts",title:"Deserts",noun:"deserts",count:()=>S.deserts.length,build:()=>specAreas(S.deserts,{world:true,rot:10,cls:"ds"})},
+      {id:"rivers",title:"Rivers",noun:"rivers",count:()=>S.rivers.length,build:()=>specAreas(S.rivers,{world:true,rot:10,cls:"riv",line:true})},
+      {id:"lakes",title:"Lakes",noun:"lakes",count:()=>S.lakes.length,build:()=>specAreas(S.lakes,{world:true,rot:10,cls:"lk",tinyMarkers:true})}]}
+  ];
+  return stages;
+}
+function homeStage(){
+  const code=saved.home,idx=code&&S.stIndex[code];
+  const st={id:"home",title:"Your country",sub:"Know your own country inside out",home:true,levels:[]};
+  if(!idx)return st;
+  const cn=(["USA","GBR","NLD","PHL","BHS","GMB","MDV","MHL","SLB","ARE","COD","COG","CAF","DOM","CZE","COM","SYC"].includes(code)?"the ":"")+cname(code);
+  st.title=`Your country: ${cname(code)}`;st.info=idx;
+  const unitNodes=(d,fs)=>fs.map(f=>areaNode(f,f.properties.id,f.properties.id,d.facts[f.properties.id]));
+  if(idx.status!=="outdated")st.levels.push({id:"home-units",title:idx.title,meta:idx.types,build:async()=>{
+    const d=await needStates(code),fs=topojson.feature(d.topo,Object.values(d.topo.objects)[0]).features;
+    return {mode:"click",home:code,land:"states",states:unitNodes(d,fs),tinyMarkers:true,
+      items:fs.map(f=>({key:f.properties.id,q:f.properties.id,ans:f.properties.id,fact:d.facts[f.properties.id],rep:f}))}}});
+  if(idx.status!=="outdated"&&idx.ncap>=4)st.levels.push({id:"home-capitals",title:"Capitals: "+idx.title.replace(/ of .*$/,"").toLowerCase(),noun:"flash cards",count:idx.ncap,build:async()=>{
+    const d=await needStates(code),fs=topojson.feature(d.topo,Object.values(d.topo.objects)[0]).features;
+    const byId=Object.fromEntries(fs.map(f=>[f.properties.id,f]));
+    return {mode:"type",home:code,land:"states",states:unitNodes(d,fs),tinyMarkers:true,
+      items:d.capitals.filter(([c,s])=>byId[s]).map(([c,s,lo,la])=>({key:s,place:s,q:`Capital of ${s}`,ans:c,alts:[],capll:[lo,la],
+        fact:(d.facts[s]||"").replace(/ · Capital: [^·]*/,""),rep:byId[s]}))}}});
+  st.levels.push({id:"home-cities",title:`Major cities of ${cn}`,noun:"cities",count:null,build:async()=>{
+    const d=await needStates(code),fs=topojson.feature(d.topo,Object.values(d.topo.objects)[0]).features;
+    const seen=new Set(),pts=[];for(const [nm,lo,la,p] of d.cities){if(seen.has(nm))continue;seen.add(nm);pts.push({key:nm,name:nm,ll:[lo,la],fact:`Population about ${fmtPop(p)}`})}
+    return Object.assign(specPoints(pts.slice(0,20),{}),{home:code,land:"states",states:fs.map(f=>areaNode(f,f.properties.id,f.properties.id)),statesFlat:true})}});
+  return st;
+}
+let STAGES=[];
+function allStages(){return [...STAGES,homeStage()]}
+function findLevel(id){for(const st of allStages())for(const l of st.levels)if(l.id===id)return {st,l};return null}
+
+/* ======================= home screen ======================= */
+const starsOf=id=>(saved.prog[id]||{}).stars||0;
+const starHTML=n=>[0,1,2].map(i=>`<span class="${i<n?"on":""}">★</span>`).join("");
+function stageUnlocked(i){return i===0||saved.unlockAll||STAGES[i-1].levels.some(l=>starsOf(l.id)>0)}
+function reviewHTML(){
+  const r=reviewStats(),total=r.learning+r.mastered,n=Math.min(r.due,REVIEW_SIZE);
+  if(!total)return `<section class="review"><div><h2>Daily review</h2><p>Play any level. Everything you answer joins your review, and comes back just before you're likely to forget it.</p></div></section>`;
+  return `<section class="review ${r.due?"isdue":""}"><div><h2>${r.due?`${r.due} ${r.due===1?"card":"cards"} to review today`:"You're done for today"}</h2>
+    <p>${r.due?(r.due>REVIEW_SIZE?`Take them ${REVIEW_SIZE} at a time.`:"A few minutes keeps them in your memory."):`${r.tomorrow} coming back tomorrow.`}</p></div>
+    <dl><div><dd>${r.learning}</dd><dt>Learning</dt></div><div><dd>${r.mastered}</dd><dt>Mastered</dt></div></dl>
+    ${r.due?`<button class="primary" id="startReview">Review ${n}</button>`:""}</section>`;
+}
+function renderHome(){
+  if(!STAGES.length)STAGES=buildStages();
+  let tot=0,passed=0;
+  const lvCard=(l,locked)=>{
+    const n=typeof l.count==="function"?l.count():l.count,s=starsOf(l.id),best=(saved.prog[l.id]||{}).best;tot+=s;if(s)passed++;
+    return `<article class="lv"><h3>${esc(l.title)}</h3>
+      <div class="meta"><span>${l.meta?esc(l.meta):n?n+" "+esc(l.noun):""}${best!=null?` · best ${best}%`:""}</span><span class="stars" aria-label="${s} of 3 stars">${starHTML(s)}</span></div>
+      <div class="acts"><button class="primary" data-go="${l.id}" data-m="quiz" ${locked?"disabled":""}>Play</button>
+      <button data-go="${l.id}" data-m="learn" ${locked?"disabled":""}>Learn</button>
+      ${n>30?`<button data-go="${l.id}" data-m="quick" ${locked?"disabled":""} title="20 random questions; does not count for stars">Quick 20</button>`:""}</div></article>`;
+  };
+  let html="";
+  STAGES.forEach((st,i)=>{
+    const un=stageUnlocked(i),done=st.levels.every(l=>starsOf(l.id)>0);
+    html+=`<section class="stage ${un?"":"locked"} ${done?"done":""}"><div class="rail"><div class="dot">${i+1}</div><div class="ln"></div></div><div>
+      <div class="shead"><h2>${esc(st.title)}</h2><span class="sub">${esc(st.sub)}</span>
+      ${un?"":`<span class="lockmsg">Earn a star on any level in “${esc(STAGES[i-1].title)}” to open this stage.</span>`}</div>
+      <div class="cards">${st.levels.map(l=>lvCard(l,!un)).join("")}</div></div></section>`;
+  });
+  const hs=homeStage();
+  const opts=S.quiz.filter(f=>S.stIndex[f.properties.id]).map(f=>`<option value="${f.properties.id}" ${f.properties.id===saved.home?"selected":""}>${esc(f.properties.n)}</option>`).join("");
+  html+=`<section class="stage"><div class="rail"><div class="dot">⌂</div><div class="ln"></div></div><div>
+    <div class="shead"><h2>${esc(hs.title)}</h2><span class="sub">States, provinces, their capitals and big cities</span></div>
+    <div class="homepick" style="margin-bottom:12px"><label for="homeSel">Home country</label>
+      <select id="homeSel"><option value="">Choose a country…</option>${opts}</select></div>
+    ${hs.info?`<p class="datanote ${hs.info.status}">${hs.info.status==="verified"?`✓ ${esc(hs.info.types)}, matching the official count.`
+      :hs.info.status==="outdated"?`${esc(hs.info.note)} The states levels are turned off for now so you don't learn old borders.`
+      :`${esc(hs.info.types)}. Not yet checked against the official list.`}</p>`:""}
+    <div class="cards">${hs.levels.map(l=>lvCard(l,false)).join("")}</div></div></section>`;
+  $("ladder").innerHTML=reviewHTML()+html;
+  $("tStars").textContent=tot;$("tLevels").textContent=passed;
+  $("unlockAll").checked=!!saved.unlockAll;
+  $("resetRot").disabled=saved.rot===DEFAULT_ROT&&!Object.keys(saved.levelRot).length;
+  $("homeSel").onchange=e=>{saved.home=e.target.value||null;save();renderHome()};
+}
+$("ladder").addEventListener("click",e=>{if(e.target.closest("#startReview")){startReview();return}const b=e.target.closest("button[data-go]");if(b)openLevel(b.dataset.go,b.dataset.m)});
+$("resetRot").onclick=()=>{saved.rot=DEFAULT_ROT;saved.levelRot={};save();renderHome()};
+$("unlockAll").onchange=e=>{saved.unlockAll=e.target.checked;save();renderHome()};
+
+/* ======================= map ======================= */
+// The map is a curved (Natural Earth) projection of the globe. Sideways movement spins the globe (changes the
+// projection's centre longitude) instead of sliding a flat picture, so you can bring any ocean or country to the
+// middle and nothing is ever cut off at the edge. Up/down movement and zoom use d3.zoom as usual.
+const svg=d3.select("#map");
+const root=svg.append("g");
+let proj,path,kNow=1,homeT=d3.zoomIdentity,rotNow=0,rot0=0,lastT=d3.zoomIdentity,rafId=0,gesture=null;
+const wrapLon=a=>((a%360)+540)%360-180;
+const nearest=(from,to)=>from+wrapLon(to-from);          // the same longitude, reached the short way round
+const degPerUnit=()=>180/Math.PI/(proj.scale()*0.8707*kNow); // map units at the equator -> degrees of longitude
+function reproject(){
+  proj.rotate([-rotNow,0]);
+  root.selectAll("path").attr("d",d=>d?path(d.geo||d):null);
+  root.selectAll("circle.pt").attr("cx",d=>proj(d.ll)[0]).attr("cy",d=>proj(d.ll)[1]);
+  root.selectAll("circle.mk").each(function(d){const c=path.centroid(largestPart(d.geo));this.setAttribute("cx",c[0]);this.setAttribute("cy",c[1])});
+  sizeMarks();
+}
+function scheduleReproject(){if(!rafId)rafId=requestAnimationFrame(()=>{rafId=0;reproject()})}
+function spinBy(deg){rotNow+=deg;scheduleReproject()}
+/* a turn made by the user becomes their starting view: one for world maps, and one per regional map */
+const levelRotKey=()=>P.level.id+(P.spec&&P.spec.home?":"+P.spec.home:"");
+let rotSaveTimer=0,spinTo=null;
+function rememberRot(lon){
+  rot0=wrapLon(lon);
+  if(P.spec&&P.spec.world)saved.rot=rot0;else if(P.level)saved.levelRot[levelRotKey()]=rot0;
+  clearTimeout(rotSaveTimer);rotSaveTimer=setTimeout(save,400);
+}
+function spinUser(deg,ms){const t=(spinTo??rotNow)+deg;spinTo=t;animateRot(t,ms);rememberRot(t)}
+function animateRot(target,ms=700){
+  const from=rotNow,to=nearest(from,target);
+  if(Math.abs(to-from)<.01)return;
+  svg.transition("rot").duration(ms).tween("rot",()=>t=>{rotNow=from+(to-from)*d3.easeCubicInOut(t);reproject();if(t===1)spinTo=null});
+}
+const zoom=d3.zoom().scaleExtent([1,4000])
+  // a mostly-sideways trackpad swipe spins the globe instead of zooming
+  .filter(e=>(!e.ctrlKey||e.type==="wheel")&&!e.button&&!(e.type==="wheel"&&Math.abs(e.deltaX)>Math.abs(e.deltaY)))
+  .on("start",()=>{gesture={rot:rotNow,x:lastT.x,moved:false}})
+  .on("end",()=>{if(gesture&&gesture.moved){gesture.moved=false;rememberRot(rotNow)}})
+  .on("zoom",function(e){
+    let t=e.transform;
+    const se=e.sourceEvent,isPan=se&&/move/.test(se.type)&&Math.abs(t.k-lastT.k)<1e-9;
+    if(isPan&&proj&&gesture){
+      // turn the sideways part of a drag into rotation and keep only the up/down part as a slide.
+      // d3 measures each move from where the drag began, so rotation is set from the gesture's start, not added up.
+      const dx=t.x-gesture.x;if(Math.abs(dx)>1)gesture.moved=true;
+      const y=Math.min(H*.2,Math.max(H*(1-t.k)-H*.2,t.y));   // keep the map from sliding off the top or bottom
+      kNow=t.k;rotNow=gesture.rot-dx*degPerUnit();t=d3.zoomIdentity.translate(gesture.x,y).scale(t.k);this.__zoom=t;scheduleReproject();
+    }
+    lastT=t;root.attr("transform",t);kNow=t.k;sizeMarks();
+  });
+svg.call(zoom).on("dblclick.zoom",null);
+svg.on("wheel.spin",e=>{if(proj&&Math.abs(e.deltaX)>Math.abs(e.deltaY)){e.preventDefault();spinBy(e.deltaX*degPerUnit()*0.6);rememberRot(rotNow)}},{passive:false});
+function sizeMarks(){
+  root.selectAll("circle.pt").attr("r",5.5/kNow).attr("stroke-width",1.4/kNow);
+  root.selectAll("circle.mk").attr("r",5/kNow).attr("stroke-width",1/kNow);
+  if(!proj)return;
+  root.selectAll("circle.capdot").each(function(d){const p=proj(d.ll);this.setAttribute("cx",p[0]);this.setAttribute("cy",p[1])}).attr("r",5/kNow).attr("stroke-width",1.5/kNow);
+  root.selectAll("text.lab").each(function(d){const p=proj(d.ll);this.setAttribute("x",p[0]);this.setAttribute("y",p[1]-12/kNow)})
+    .attr("font-size",15/kNow).attr("stroke-width",3.5/kNow);
+}
+function boxT([[x0,y0],[x1,y1]],fill,maxK,cy=H/2){
+  const dx=Math.max(x1-x0,1e-3),dy=Math.max(y1-y0,1e-3),k=Math.max(1,Math.min(maxK,fill/Math.max(dx/W,dy/H)));
+  return d3.zoomIdentity.translate(W/2,cy).scale(k).translate(-(x0+x1)/2,-(y0+y1)/2);
+}
+const zoomTo=(t,ms=700)=>svg.transition().duration(ms).call(zoom.transform,t);
+function goHome(ms=600){animateRot(rot0,ms);zoomTo(homeT,ms)}
+function repBounds(rep){
+  if(rep.type==="Point"){const p=proj(rep.coordinates);return [[p[0]-1,p[1]-1],[p[0]+1,p[1]+1]]}
+  return path.bounds(largestPart(rep));
+}
+function repLL(rep){return rep.type==="Point"?rep.coordinates:d3.geoCentroid(largestPart(rep))}
+function focusOn(rep){
+  // spin the globe so the target sits in the middle, then zoom to it
+  const target=nearest(rotNow,repLL(rep)[0]),from=rotNow;
+  proj.rotate([-target,0]);const b=repBounds(rep);proj.rotate([-from,0]);
+  const big=(b[1][0]-b[0][0])>W*.5;
+  // keep the target above the bottom card: aim at the upper part of the visible map
+  const card=!$("mcCard").hidden||!$("revCard").hidden||!$("tyCard").hidden||P.spec&&P.spec.mode!=="click";
+  const r=svg.node().getBoundingClientRect(),s=Math.min(r.width/W,r.height/H),visTop=(H-r.height/s)/2,visH=r.height/s;
+  const cy=card&&r.width&&r.height?visTop+visH*.3:H/2;
+  animateRot(target,700);
+  zoomTo(big?d3.zoomIdentity:boxT(b,rep.type==="Point"?.06:(card?.22:.3),Math.max(homeT.k*8,24),cy));
+}
+function repPoint(rep){return rep.type==="Point"?proj(rep.coordinates):path.centroid(largestPart(rep))}
+function circMeanLon(reps){
+  let x=0,y=0;for(const r of reps){const c=repLL(r);x+=Math.cos(c[0]*Math.PI/180);y+=Math.sin(c[0]*Math.PI/180)}
+  return Math.atan2(y,x)*180/Math.PI;
+}
+function setState(key,s){root.selectAll("path,circle").filter(d=>d&&d.key===key).attr("data-s",s)}
+
+function drawSpec(sp){
+  svg.interrupt("rot");spinTo=null;root.selectAll("*").remove();
+  const reps=sp.items.map(i=>i.rep);
+  let rot=sp.world?saved.rot:sp.rot!=null?sp.rot:circMeanLon(reps);
+  if(sp.home){const c=d3.geoCentroid(largestPart(S.byCode[sp.home]));rot=c[0]}
+  rot0=rotNow=rot;
+  proj=d3.geoNaturalEarth1().rotate([-rot,0]).fitExtent([[4,4],[W-4,H-4]],{type:"Sphere"});
+  path=d3.geoPath(proj);
+  root.append("path").datum({geo:{type:"Sphere"}}).attr("class","globe").attr("d",d=>path(d.geo));
+  root.append("path").datum({geo:d3.geoGraticule10()}).attr("class","grat").attr("d",d=>path(d.geo));
+  const pick=(e,d)=>{e.stopPropagation();onPick(d)};
+  const hov=(e,d)=>{if(P.learn)toast(d.name,d.fact,1400)};
+  const bind=sel=>sel.classed("el",true).on("click",pick).on("mousemove",hov);
+  if(sp.sea)bind(root.append("g").selectAll("path").data(sp.sea).join("path").attr("class","sea").attr("d",d=>path(d.geo)));
+  if(sp.land!=="none"){
+    const nodes=S.countries.map(f=>areaNode(f,f.properties.id,landName(f.properties),f.properties.q?countryFact(f.properties.id):""));
+    const sel=root.append("g").selectAll("path").data(nodes).join("path").attr("class","land").attr("d",d=>path(d.geo));
+    const dimC=sp.dimFor||null;
+    if(sp.dimOthers)sel.classed("off",d=>!sp.targetSet.has(d.key));
+    if(dimC)sel.classed("off",d=>d.geo.properties.c!==dimC);
+    if(sp.home)sel.classed("off",true);
+    if(sp.land==="countries"&&sp.landEl)bind(sel);else sel.classed("flat",true);
+  }else{
+    root.append("g").selectAll("path").data(S.countries.filter(f=>f.properties.c==="Seven seas (open ocean)")).join("path").attr("class","land flat").attr("d",d=>path(d));
+  }
+  if(sp.states){
+    const sel=root.append("g").selectAll("path").data(sp.states).join("path").attr("class","land").attr("d",d=>path(d.geo));
+    if(sp.statesFlat)sel.classed("flat",true);else bind(sel);
+  }
+  if(sp.overlay){
+    const o=sp.overlay,g=root.append("g");
+    if(o.line){
+      g.selectAll("path.riv").data(o.feats).join("path").attr("class","riv el").attr("d",d=>path(d.geo));
+      bind(g.selectAll("path.hit").data(o.feats).join("path").attr("class","hit").attr("d",d=>path(d.geo)));
+    }else bind(g.selectAll("path").data(o.feats).join("path").attr("class",o.cls).attr("d",d=>path(d.geo)));
+  }
+  if(sp.mesh)root.append("path").datum({geo:S.borders}).attr("class","mesh").attr("d",d=>path(d.geo));
+  // initial view
+  if(sp.world){homeT=d3.zoomIdentity}
+  else{
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    for(const r of reps){const b=repBounds(r);if(b[1][0]-b[0][0]>W*.6)continue;x0=Math.min(x0,b[0][0]);y0=Math.min(y0,b[0][1]);x1=Math.max(x1,b[1][0]);y1=Math.max(y1,b[1][1])}
+    homeT=x0<1e9?boxT([[x0,y0],[x1,y1]],.92,4000):d3.zoomIdentity;
+  }
+  // markers so tiny targets can be clicked
+  const tinyAreas=sp.mode!=="mc"&&!sp.points&&(sp.land==="countries"||sp.tinyMarkers);
+  if(tinyAreas){
+    const k0=homeT.k;
+    const small=sp.items.filter(i=>i.rep.type!=="Point"&&path.area(i.rep)*k0*k0<26);
+    const nodeFor=key=>{const sel=root.selectAll("path").filter(d=>d&&d.key===key&&d.geo);return sel.empty()?null:sel.datum()};
+    bind(root.append("g").selectAll("circle").data(small.map(i=>nodeFor(i.key)).filter(Boolean)).join("circle").attr("class","mk")
+      .attr("cx",d=>path.centroid(largestPart(d.geo))[0]).attr("cy",d=>path.centroid(largestPart(d.geo))[1]));
+  }
+  if(sp.points)bind(root.append("g").selectAll("circle").data(sp.points).join("circle").attr("class","pt")
+    .attr("cx",d=>proj(d.ll)[0]).attr("cy",d=>proj(d.ll)[1]));
+  root.append("g").attr("class","labels");
+  // regional maps frame themselves at their natural centre, then apply the user's saved turn for that map
+  const savedTurn=sp.world||!P.level?null:saved.levelRot[levelRotKey()];
+  if(savedTurn!=null){rot0=rotNow=savedTurn;reproject()}
+  lastT=homeT;svg.call(zoom.transform,homeT);sizeMarks();
+}
+function addCapMark(ll,text){
+  const g=root.select("g.labels");
+  g.append("circle").datum({ll}).attr("class","capdot");
+  g.append("text").datum({ll}).attr("class","lab").text(text);sizeMarks();
+}
+function addLabel(rep,text){
+  root.select("g.labels").append("text").datum({ll:repLL(rep)}).attr("class","lab").text(text);sizeMarks();
+}
+
+/* ======================= player ======================= */
+const P={};
+let tt;
+function toast(msg,sub="",ms=1800,cls=""){
+  const t=$("toast");t.innerHTML=esc(msg)+(sub?`<small>${esc(sub)}</small>`:"");t.className="toast show "+cls;clearTimeout(tt);tt=setTimeout(()=>t.className="toast",ms);
+}
+async function openLevel(id,mode,reviewKeys){
+  const f=findLevel(id);if(!f){if(mode==="review")reviewNext();return}
+  if(mode!=="review")P.review=null;
+  $("learnBtn").hidden=mode==="review";
+  $("home").hidden=true;$("play").hidden=false;$("over").hidden=true;$("revCard").hidden=true;$("mcCard").hidden=true;$("learn").hidden=true;
+  $("toast").className="toast";$("tyCard").hidden=true;$("loading").hidden=false;$("target").textContent=f.l.title;$("lbl").textContent="Loading";$("pflag").hidden=true;
+  try{
+    if(f.l.needFlags)await needFlags();
+    const sp=await f.l.build();if(sp.needFlags)await needFlags();
+    P.level=f.l;P.stage=f.st;P.spec=sp;$("loading").hidden=true;
+    const hashId=mode==="review"?"review":id;if(location.hash.slice(1)!==hashId)history.replaceState(null,"","#"+hashId);
+    drawSpec(sp);
+    P.learn=false;$("learn").hidden=true;$("wrap").classList.remove("withlearn");
+    if(mode==="review"){
+      const have=new Set(sp.items.map(i=>i.key)),keys=reviewKeys.filter(k=>have.has(k));
+      if(!keys.length){reviewNext();return}
+      startRound(keys,0,false);return;
+    }
+    startRound(sp.items.map(i=>i.key),mode==="quick"?20:0,mode!=="quick");
+    if(mode==="learn")setLearn(true);
+  }catch(err){$("loading").textContent="Could not load this level: "+err.message}
+}
+function startReview(){
+  const day=today(),due=Object.entries(saved.srs).filter(([id,c])=>c[2]<=day&&parseCard(id))
+    .sort((a,b)=>a[1][2]-b[1][2]||b[1][4]-a[1][4]||Math.random()-.5).slice(0,REVIEW_SIZE);
+  if(!due.length){backHome();return}
+  const groups=new Map();
+  for(const [id] of due){const c=parseCard(id);if(!groups.has(c.level))groups.set(c.level,[]);groups.get(c.level).push(c.key)}
+  P.review={groups:shuffle([...groups].map(([level,keys])=>({level,keys}))),gi:0,done:0,total:due.length,res:{good:0,ok:0,miss:0},missed:[]};
+  $("home").hidden=true;$("play").hidden=false;reviewNext();
+}
+async function reviewNext(){
+  const rv=P.review;if(!rv)return;
+  const g=rv.groups[rv.gi++];
+  if(!g){finishReview();return}
+  await openLevel(g.level,"review",g.keys);
+}
+function finishReview(){
+  const rv=P.review,r=reviewStats(),n=rv.res.good+rv.res.ok+rv.res.miss;
+  P.phase="done";$("ng").textContent=rv.res.good+rv.res.ok;$("nm").textContent=rv.res.miss;$("skip").disabled=true;$("lbl").textContent="Daily review";$("target").textContent="Complete";$("prog").style.width="100%";
+  $("sumStars").innerHTML="";$("sumh").textContent=`${rv.res.good+rv.res.ok} of ${n} remembered`;
+  $("sump").textContent=r.due?`${r.due} still to review today, including anything you missed.`:`All done for today. ${r.tomorrow} coming back tomorrow.`;
+  $("sumlists").innerHTML=rv.missed.length?`<p style="margin:12px 0 6px;color:var(--ink);font-weight:600">Coming back today</p><div class="chips">${rv.missed.map(m=>`<span class="plain">${esc(m)}</span>`).join("")}</div>`:"";
+  $("practice").textContent="Review more";$("practice").hidden=!r.due;$("again").hidden=true;$("nextLevel").hidden=true;$("over").hidden=false;
+}
+function backHome(){
+  P.review=null;
+  $("play").hidden=true;$("home").hidden=false;history.replaceState(null,"",location.pathname+location.search);renderHome();
+}
+function startRound(keys,limit,full){
+  const list=shuffle(keys.slice());
+  P.queue=limit?list.slice(0,limit):list;P.full=full&&!limit;P.idx=0;P.attempts=0;P.results={};P.phase="ask";
+  P.byKey=Object.fromEntries(P.spec.items.map(i=>[i.key,i]));
+  root.selectAll(".el").attr("data-s",null);root.select("g.labels").selectAll("*").remove();
+  $("over").hidden=true;$("revCard").hidden=true;
+  goHome(400);ask();
+}
+const cur=()=>P.byKey[P.queue[P.idx]];
+const tk=it=>it.tkey||it.key;
+function render(){
+  const done=Object.keys(P.results).length,good=Object.values(P.results).filter(r=>r!=="miss").length;
+  const rv=P.review,rvDone=rv?rv.done:0,rvTotal=rv?rv.total:P.queue.length;
+  $("count").innerHTML=`<b>${rvDone+Math.min(P.idx+1,P.queue.length)}</b>/${rvTotal}`;
+  $("ng").textContent=good+(rv?rv.res.good+rv.res.ok:0);$("nm").textContent=done-good+(rv?rv.res.miss:0);$("prog").style.width=(100*(rvDone+done)/rvTotal)+"%";
+  $("skip").disabled=P.phase!=="ask"||P.learn;
+  $("learnBtn").textContent=P.learn?"Back to quiz":"Learn";
+  if(P.learn){$("lbl").textContent=P.level.title;$("target").textContent="Learn mode";$("pflag").hidden=true;return}
+  const it=cur();if(!it)return;
+  const sp=P.spec;
+  if(sp.mode==="type"){
+    $("pflag").hidden=true;
+    $("lbl").textContent=P.phase==="answered"?`Capital of ${it.place}`:"What is the capital of";
+    $("target").textContent=P.phase==="answered"?it.ans:it.place+"?";
+    $("skip").disabled=P.phase!=="ask";return;
+  }
+  $("lbl").textContent=P.phase==="revealed"?"The answer":sp.mode==="mc"?"Choose":it.flag?"Find the country with this flag":"Find";
+  $("target").textContent=P.phase==="revealed"?it.ans:it.flag?"":it.q;
+  if(it.flag&&P.phase!=="revealed"){$("pflag").src=flagURL(it.flag);$("pflag").hidden=false}else $("pflag").hidden=true;
+  if(it.flag&&P.phase==="ask")$("target").textContent="?";
+}
+function ask(){
+  P.phase="ask";P.attempts=0;render();
+  const it=cur(),sp=P.spec;
+  if(sp.mode==="mc"){
+    setState(it.key,"focus");focusOn(it.rep);
+    const pool=sp.items.filter(x=>x.key!==it.key&&x.ans!==it.ans);
+    const same=shuffle(pool.filter(x=>x.group===it.group)),other=shuffle(pool.filter(x=>x.group!==it.group));
+    const opts=shuffle([it,...[...same.slice(0,2),...other].slice(0,3)]);
+    P.opts=opts;
+    $("opts").className="opts"+(sp.mcKind==="flag"?" flagopts":"");
+    $("opts").innerHTML=opts.map((o,i)=>`<button data-i="${i}">${sp.mcKind==="flag"?`<img alt="Flag option ${i+1}" src="${flagURL(o.key)}">`:esc(o.ans)}<kbd>${i+1}</kbd></button>`).join("");
+    $("mcCard").hidden=false;
+  }else $("mcCard").hidden=true;
+  if(sp.mode==="type"){
+    setState(tk(it),"focus");focusOn(it.rep);
+    $("tyQ").textContent=`What is the capital of ${it.place}?`;
+    $("tyIn").value="";$("tyIn").disabled=false;$("tyRes").hidden=true;$("tySubmit").hidden=false;$("tyGiveUp").hidden=false;$("tyNext").hidden=true;
+    $("tyCard").hidden=false;
+    if(matchMedia("(pointer:fine)").matches)$("tyIn").focus({preventScroll:true});
+  }else $("tyCard").hidden=true;
+}
+/* flash cards: typed answers */
+const normA=s=>(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/^the\s+/,"").replace(/\bst\.?\s/g,"saint ").replace(/[^a-z0-9]/g,"");
+function acceptedAnswers(it){
+  const out=new Set();
+  for(const a of [it.ans,...(it.alts||[])])
+    for(const part of a.split(" / ")){
+      out.add(normA(part.replace(/\s*\([^)]*\)/g,"")));
+      for(const m of part.matchAll(/\(([^)]*)\)/g))if(/^[A-Z]/.test(m[1]))out.add(normA(m[1])); // "Port Blair (Sri Vijaya Puram)" accepts both
+    }
+  out.delete("");return [...out];
+}
+function editDist(a,b){
+  const d=Array.from({length:a.length+1},(_,i)=>[i]);for(let j=1;j<=b.length;j++)d[0][j]=j;
+  for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++){
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+    if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1); // swapped letters count as one slip
+  }
+  return d[a.length][b.length];
+}
+function gradeAnswer(it,typed){
+  const n=normA(typed);if(!n)return null;
+  let close=false;
+  for(const a of acceptedAnswers(it)){
+    if(n===a)return "good";
+    const tol=a.length<=3?0:a.length<=8?1:2;
+    if(editDist(n,a)<=tol)close=true;
+  }
+  return close?"ok":"miss";
+}
+function flashAnswer(typed,gaveUp){
+  if(P.phase!=="ask"||P.spec.mode!=="type")return;
+  const it=cur(),g=gaveUp?"miss":gradeAnswer(it,typed);
+  if(!g){$("tyIn").focus();return}
+  setResult(it,g);P.phase="answered";setState(tk(it),g);
+  const res=$("tyRes");res.className="tyres "+(g==="good"?"yes":g==="ok"?"close":"no");
+  const head=g==="good"?`✓ ${it.ans}`:g==="ok"?`Almost: ${it.ans}`:gaveUp?it.ans:`✗ It's ${it.ans}`;
+  const note=g==="ok"?`You wrote “${typed.trim()}”. Check the spelling.`:g==="miss"&&!gaveUp?`You wrote “${typed.trim()}”.`:"";
+  res.innerHTML=`<b>${esc(head)}</b>${note?`<small>${esc(note)}</small>`:""}${it.fact?`<small>${esc(it.place)} · ${esc(it.fact)}</small>`:""}`;
+  res.hidden=false;$("tyIn").disabled=true;$("tySubmit").hidden=true;$("tyGiveUp").hidden=true;$("tyNext").hidden=false;$("tyNext").focus();
+  if(it.capll&&it.capll[0]!=null)addCapMark(it.capll,it.ans.replace(/\s*\([^)]*\)/g,"").split(" / ")[0]);
+  render();
+}
+$("tyForm").addEventListener("submit",e=>{e.preventDefault();if(P.phase==="answered")advance();else flashAnswer($("tyIn").value,false)});
+$("tyGiveUp").onclick=()=>flashAnswer("",true);
+$("tyNext").onclick=()=>advance();
+$("opts").addEventListener("click",e=>{const b=e.target.closest("button[data-i]");if(b)chooseOpt(+b.dataset.i)});
+function chooseOpt(i){
+  if(P.phase!=="ask"||P.learn)return;
+  const it=cur(),o=P.opts[i],btn=$("opts").children[i];
+  if(!o||btn.disabled)return;
+  if(o.key===it.key){
+    btn.classList.add("yes");const r=P.attempts===0?"good":"ok";setResult(it,r);setState(it.key,r);
+    toast(`✓ ${it.ans}`,it.fact,1600,"yes");P.phase="wait";setTimeout(advance,850);return;
+  }
+  btn.classList.add("no");btn.disabled=true;P.attempts++;
+  toast(P.spec.mcKind==="flag"?`That's the flag of ${cname(o.key)}`:`${o.ans} is the capital of ${cname(o.key)}`,"",2000,"bad");
+  if(P.attempts>=2)reveal("2 misses");
+  render();
+}
+function onPick(d){
+  if(P.learn){toast(d.name,d.fact,2600);return}
+  const it=cur();
+  if(P.phase!=="ask"||P.spec.mode!=="click"||!it){toast(d.name,d.fact,2200);return}
+  if(d.key===tk(it)){
+    const r=P.attempts===0?"good":"ok";setResult(it,r);setState(tk(it),r);
+    toast(P.attempts===0?`✓ ${it.ans}`:`✓ ${it.ans}, on try ${P.attempts+1}`,it.fact,1500,"yes");
+    P.phase="wait";setTimeout(advance,650);return;
+  }
+  const owners=P.spec.items.filter(x=>tk(x)===d.key);
+  if(owners.length&&owners.every(x=>P.results[x.key])){toast(`That's ${d.name}`,"Already done",1600);return}
+  P.attempts++;
+  const sel=root.selectAll(".el").filter(x=>x&&x.key===d.key),prev=sel.attr("data-s");
+  sel.attr("data-s","wrong");setTimeout(()=>sel.attr("data-s",prev),700);
+  if(P.attempts>=3){toast(`That's ${d.name}`,"",2400,"bad");reveal("3 misses, here it is")}
+  else toast(`That's ${d.name}`,`${3-P.attempts} ${3-P.attempts===1?"try":"tries"} left`,2400,"bad");
+}
+function reveal(why){
+  const it=cur();setResult(it,"miss");P.phase="revealed";setState(tk(it),"reveal");
+  addLabel(it.rep,it.ans);focusOn(it.rep);
+  if(P.spec.mode==="mc"){
+    [...$("opts").children].forEach((b,i)=>{b.disabled=true;if(P.opts[i].key===it.key)b.classList.add("yes")});
+  }
+  $("revK").textContent=why;
+  $("revV").innerHTML=(P.spec.mode==="mc"&&P.spec.mcKind==="flag"||it.flag?`<img alt="" src="${flagURL(it.key)}">`:"")+esc(it.ans);
+  const showQ=it.q!==it.ans&&P.spec.mode!=="mc"&&!it.flag&&!(it.fact||"").includes(it.q);
+  $("revH").textContent=(showQ?it.q+" · ":"")+(it.fact||"Highlighted on the map");
+  $("revCard").hidden=false;$("next").focus();render();
+}
+function advance(){
+  const it=cur();
+  if(P.phase==="revealed"){setState(tk(it),"miss");root.select("g.labels").selectAll("*").remove();$("revCard").hidden=true}
+  if(P.spec.mode==="mc")setState(it.key,null);
+  if(P.spec.mode==="type")root.select("g.labels").selectAll("*").remove();
+  P.idx++;
+  if(P.idx>=P.queue.length){finish();return}
+  if(P.spec.mode==="click")goHome(500);
+  ask();
+}
+function finish(){
+  P.phase="done";$("mcCard").hidden=true;$("tyCard").hidden=true;
+  if(P.review){
+    const rv=P.review;
+    for(const [k,x] of Object.entries(P.results)){rv.res[x]++;if(x==="miss"){const i=P.byKey[k];rv.missed.push(i.place?`${i.place}: ${i.ans}`:i.ans)}}
+    rv.done+=Object.keys(P.results).length;reviewNext();return;
+  }
+  $("practice").textContent="Practice the misses";$("again").hidden=false;
+  const keys=Object.keys(P.results),miss=keys.filter(k=>P.results[k]==="miss"),ok=keys.filter(k=>P.results[k]==="ok"),good=keys.length-miss.length-ok.length;
+  const pct=Math.round(100*(good+ok.length*.5)/keys.length),stars=pct>=95?3:pct>=80?2:pct>=60?1:0;
+  let note="";
+  if(P.full){
+    const pr=saved.prog[P.level.id]||{};
+    if(pct>(pr.best??-1)){saved.prog[P.level.id]={best:pct,stars:Math.max(stars,pr.stars||0)};save();note=pr.best!=null?" New best!":""}
+  }else note=" Practice rounds don't count toward stars.";
+  $("sumStars").innerHTML=starHTML(stars);
+  $("sumh").textContent=`${pct}% on ${P.level.title}`;
+  $("sump").textContent=`${good} right first time, ${ok.length} after a miss, ${miss.length} skipped or shown.${note}`;
+  const chip=(arr,cls,title)=>arr.length?`<p style="margin:12px 0 6px;color:var(--ink);font-weight:600">${title}</p><div class="chips">${arr.map(k=>P.byKey[k]).sort((a,b)=>a.ans.localeCompare(b.ans)).map(i=>`<button class="${cls}" data-k="${esc(i.key)}">${esc(i.place?i.place+": "+i.ans:i.ans)}</button>`).join("")}</div>`:"";
+  $("sumlists").innerHTML=chip(miss,"miss","Missed: tap one to see it on the map")+chip(ok,"ok","Took more than one try");
+  $("practice").hidden=!(miss.length+ok.length);
+  const nl=nextLevelOf(P.level.id);$("nextLevel").hidden=!nl;
+  $("over").hidden=false;render();
+}
+function nextLevelOf(id){
+  const st=allStages();
+  for(let s=0;s<st.length;s++){const i=st[s].levels.findIndex(l=>l.id===id);if(i<0)continue;
+    if(i+1<st[s].levels.length)return st[s].levels[i+1].id;
+    if(s+1<st.length-1&&st[s+1].levels.length)return st[s+1].levels[0].id;return null}
+  return null;
+}
+$("sumlists").addEventListener("click",e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k)return;const it=P.byKey[k];$("over").hidden=true;
+  focusOn(it.rep);setState(tk(it),"reveal");toast(it.ans,it.fact,2800);setTimeout(()=>{setState(tk(it),P.results[k]);if(P.phase==="done")$("over").hidden=false},2800)});
+$("practice").onclick=()=>P.review?startReview():startRound(Object.keys(P.results).filter(k=>P.results[k]!=="good"),0,false);
+$("again").onclick=()=>startRound(P.spec.items.map(i=>i.key),0,true);
+$("toLevels").onclick=backHome;$("back").onclick=backHome;
+$("nextLevel").onclick=()=>{const n=nextLevelOf(P.level.id);if(n)openLevel(n,"quiz")};
+const skipQ=()=>{if(P.phase!=="ask"||P.learn)return;if(P.spec.mode==="type")flashAnswer("",true);else reveal("Skipped")};
+$("skip").onclick=skipQ;
+$("next").onclick=advance;
+$("zin").onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,1.6);
+$("zout").onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,1/1.6);
+$("zhome").onclick=()=>goHome(500);
+$("spinL").onclick=()=>spinUser(-30,400);
+$("spinR").onclick=()=>spinUser(30,400);
+
+/* learn mode */
+function setLearn(on){
+  P.learn=on;$("learn").hidden=!on;$("wrap").classList.toggle("withlearn",on);
+  if(on){
+    $("mcCard").hidden=true;$("revCard").hidden=true;$("tyCard").hidden=true;
+    $("learnTitle").textContent=P.level.title;$("learnSearch").value="";fillLearn("");
+  }else{
+    root.selectAll("path,circle").attr("data-s",null);for(const [k,r] of Object.entries(P.results))setState(tk(P.byKey[k]),r);
+    if(P.phase==="ask"&&P.spec.mode!=="click")ask();
+    else if(P.phase==="answered")$("tyCard").hidden=false;
+    else if(P.phase==="revealed")$("revCard").hidden=false;
+  }
+  render();
+}
+function fillLearn(q){
+  const sp=P.spec,flagish=sp.needFlags||sp.mcKind==="flag";
+  const rows=sp.items.slice().sort((a,b)=>(a.q===a.ans?a.ans:a.q).localeCompare(b.q===b.ans?b.ans:b.q))
+    .filter(i=>!q||(i.q+" "+i.ans).toLowerCase().includes(q.toLowerCase()));
+  $("learnList").innerHTML=rows.map(i=>{
+    const title=sp.mode==="mc"?cname(i.key):(i.q===i.ans||i.flag?i.ans:i.q.replace(/^Capital of /,""));
+    const side=sp.mode==="mc"?(sp.mcKind==="capital"?i.ans:""):(i.q!==i.ans&&!i.flag?i.ans:(sp.land==="states"&&!sp.points&&i.fact?i.fact.split(" · ")[0]:""));
+    return `<li><button data-k="${esc(i.key)}">${flagish&&S.flags?`<img alt="" src="${flagURL(i.key)}">`:""}<span>${esc(title)}</span>${side?`<span class="a">${esc(side)}</span>`:""}</button></li>`}).join("");
+}
+$("learnSearch").oninput=e=>fillLearn(e.target.value);
+$("learnList").addEventListener("click",e=>{const b=e.target.closest("button[data-k]");if(!b)return;const it=P.byKey[b.dataset.k];
+  setState(tk(it),"focus");focusOn(it.rep);
+  toast(P.spec.mode==="mc"?cname(it.key):it.ans,it.fact,2600);
+  setTimeout(()=>setState(tk(it),P.results[it.key]||null),2600)});
+$("learnBtn").onclick=()=>setLearn(!P.learn);
+$("learnGo").onclick=()=>{setLearn(false);if(P.phase==="done")startRound(P.spec.items.map(i=>i.key),0,true)};
+
+document.addEventListener("keydown",e=>{
+  if($("play").hidden||/INPUT|SELECT/.test(e.target.tagName))return;
+  if((e.key==="s"||e.key==="S")&&P.phase==="ask"&&!P.learn){e.preventDefault();skipQ()}
+  else if((e.key==="Enter"||e.key===" ")&&(P.phase==="revealed"||P.phase==="answered")&&e.target.tagName!=="BUTTON"){e.preventDefault();advance()}
+  else if(/^[1-4]$/.test(e.key)&&P.spec.mode==="mc")chooseOpt(+e.key-1);
+  else if(e.key==="ArrowLeft"){e.preventDefault();spinUser(-20,300)}
+  else if(e.key==="ArrowRight"){e.preventDefault();spinUser(20,300)}
+  else if(e.key==="Escape")backHome();
+});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(h&&findLevel(h)&&(!P.level||P.level.id!==h))openLevel(h,"quiz")});
+boot().catch(err=>{$("ladder").innerHTML=`<p>Could not load the map data (${esc(err.message)}). Reload the page to try again.</p>`});
+</script>
+
+</html>
