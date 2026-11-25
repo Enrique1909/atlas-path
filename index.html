@@ -578,7 +578,7 @@ function reproject(){
   proj.rotate([-rotNow,0]);
   root.selectAll("path").attr("d",d=>d?path(d.geo||d):null);
   root.selectAll("circle.pt").attr("cx",d=>proj(d.ll)[0]).attr("cy",d=>proj(d.ll)[1]);
-  root.selectAll("circle.mk").each(function(d){const c=path.centroid(largestPart(d.geo));this.setAttribute("cx",c[0]);this.setAttribute("cy",c[1])});
+  root.selectAll("circle.mk").each(function(d){const c=proj(d.ll);this.setAttribute("cx",c[0]);this.setAttribute("cy",c[1])});
   sizeMarks();
 }
 function scheduleReproject(){if(!rafId)rafId=requestAnimationFrame(()=>{rafId=0;reproject()})}
@@ -636,9 +636,36 @@ const zoomTo=(t,ms=700)=>svg.transition().duration(ms).call(zoom.transform,t);
 let userT=null;
 function goHome(ms=600){animateRot(rot0,ms);zoomTo(homeT,ms)}
 function restView(ms=600){animateRot(rot0,ms);zoomTo(userT||homeT,ms)}
+/* A place can be in several separate pieces (Puducherry has 4 enclaves on two coasts). Pieces close together
+   (about 25 km apart or less) count as one area; each area gets its own marker when small, and reveals frame them all. */
+function partClusters(f){
+  if(f.__clusters)return f.__clusters;
+  const g=f.geometry||f,polys=g.type==="MultiPolygon"?g.coordinates:g.type==="Polygon"?[g.coordinates]:[];
+  const parts=polys.map(c=>{const p={type:"Polygon",coordinates:c};return {ll:d3.geoCentroid(p),geoArea:d3.geoArea(p),p}}).sort((a,b)=>b.geoArea-a.geoArea);
+  const cl=[],main=parts[0],rad=Math.PI/180;
+  for(const p of parts){
+    const near=cl.find(c=>d3.geoDistance(c.ll,p.ll)<0.22*rad);
+    // a tiny islet just off the coast belongs to the main area; a far-off or sizeable piece (Mahé, Daman, Diu) is its own
+    const host=main&&p!==main&&p.geoArea<main.geoArea*0.01?cl.find(c=>c.polys.some(q=>nearCoast(q,p.ll,0.5*rad))):null;
+    if(near)near.polys.push(p.p);else if(host)host.polys.push(p.p);else cl.push({ll:p.ll,polys:[p.p]});
+  }
+  return f.__clusters=cl;
+}
+// is point ll within `dist` radians of polygon q's outline? (checks its outer ring's vertices)
+function nearCoast(q,ll,dist){const ring=q.coordinates[0],step=Math.max(1,Math.floor(ring.length/400));
+  for(let i=0;i<ring.length;i+=step)if(d3.geoDistance(ring[i],ll)<dist)return true;return false}
+const clusterArea=c=>d3.sum(c.polys,p=>path.area(p));
+function partsNote(rep){
+  if(!rep||rep.type==="Point")return "";
+  const n=partClusters(rep).length;return n>1&&spanOK(rep)?`In ${n} separate areas, all highlighted on the map`:"";
+}
+function spanOK(rep){
+  const [[x0,y0],[x1,y1]]=d3.geoBounds(rep);let dx=x1-x0;if(dx<0)dx+=360;return dx<=25&&y1-y0<=25;
+}
 function repBounds(rep){
   if(rep.type==="Point"){const p=proj(rep.coordinates);return [[p[0]-1,p[1]-1],[p[0]+1,p[1]+1]]}
-  return path.bounds(largestPart(rep));
+  // frame every piece when they are near each other; a country with far-off territories frames its main piece
+  return partClusters(rep).length>1&&spanOK(rep)?path.bounds(rep):path.bounds(largestPart(rep));
 }
 function repLL(rep){return rep.type==="Point"?rep.coordinates:d3.geoCentroid(largestPart(rep))}
 function focusOn(rep){
@@ -708,10 +735,17 @@ function drawSpec(sp){
   const tinyAreas=sp.mode!=="mc"&&!sp.points&&(sp.land==="countries"||sp.tinyMarkers);
   if(tinyAreas){
     const k0=homeT.k;
-    const small=sp.items.filter(i=>i.rep.type!=="Point"&&path.area(i.rep)*k0*k0<26);
     const nodeFor=key=>{const sel=root.selectAll("path").filter(d=>d&&d.key===key&&d.geo);return sel.empty()?null:sel.datum()};
-    bind(root.append("g").selectAll("circle").data(small.map(i=>nodeFor(i.key)).filter(Boolean)).join("circle").attr("class","mk")
-      .attr("cx",d=>path.centroid(largestPart(d.geo))[0]).attr("cy",d=>path.centroid(largestPart(d.geo))[1]));
+    const marks=[];
+    for(const i of sp.items){
+      if(i.rep.type==="Point")continue;
+      const node=nodeFor(i.key);if(!node)continue;
+      const whole=path.area(i.rep)*k0*k0<26,cl=partClusters(i.rep);
+      // a marker on each small area: every area of a tiny place, or the small outlying areas of a state
+      for(const c of cl)if(whole||(sp.home&&cl.length>1&&clusterArea(c)*k0*k0<26))marks.push(Object.assign({},node,{ll:c.ll}));
+    }
+    bind(root.append("g").selectAll("circle").data(marks).join("circle").attr("class","mk")
+      .attr("cx",d=>proj(d.ll)[0]).attr("cy",d=>proj(d.ll)[1]));
   }
   if(sp.points)bind(root.append("g").selectAll("circle").data(sp.points).join("circle").attr("class","pt")
     .attr("cx",d=>proj(d.ll)[0]).attr("cy",d=>proj(d.ll)[1]));
@@ -874,7 +908,7 @@ function flashAnswer(typed,gaveUp){
   const res=$("tyRes");res.className="tyres "+(g==="good"?"yes":g==="ok"?"close":"no");
   const head=g==="good"?`✓ ${it.ans}`:g==="ok"?`Almost: ${it.ans}`:gaveUp?it.ans:`✗ It's ${it.ans}`;
   const note=g==="ok"?`You wrote “${typed.trim()}”. Check the spelling.`:g==="miss"&&!gaveUp?`You wrote “${typed.trim()}”.`:"";
-  res.innerHTML=`<b>${esc(head)}</b>${note?`<small>${esc(note)}</small>`:""}${it.fact?`<small>${esc(it.place)} · ${esc(it.fact)}</small>`:""}`;
+  res.innerHTML=`<b>${esc(head)}</b>${note?`<small>${esc(note)}</small>`:""}${it.fact?`<small>${esc(it.place)} · ${esc(it.fact)}</small>`:""}${partsNote(it.rep)?`<small>${esc(it.place)} is ${esc(partsNote(it.rep).replace(/^In/,"in"))}.</small>`:""}`;
   res.hidden=false;$("tyIn").disabled=true;$("tySubmit").hidden=true;$("tyGiveUp").hidden=true;$("tyNext").hidden=false;$("tyNext").focus();
   if(it.capll&&it.capll[0]!=null)addCapMark(it.capll,it.ans.replace(/\s*\([^)]*\)/g,"").split(" / ")[0]);
   render();
@@ -921,8 +955,8 @@ function reveal(why){
   }
   $("revK").textContent=why;
   $("revV").innerHTML=(P.spec.mode==="mc"&&P.spec.mcKind==="flag"||it.flag?`<img alt="" src="${flagURL(it.key)}">`:"")+esc(it.ans);
-  const showQ=it.q!==it.ans&&P.spec.mode!=="mc"&&!it.flag&&!(it.fact||"").includes(it.q);
-  $("revH").textContent=(showQ?it.q+" · ":"")+(it.fact||"Highlighted on the map");
+  const showQ=it.q!==it.ans&&P.spec.mode!=="mc"&&!it.flag&&!(it.fact||"").includes(it.q),pn=partsNote(it.rep);
+  $("revH").textContent=(showQ?it.q+" · ":"")+([it.fact,pn].filter(Boolean).join(" · ")||"Highlighted on the map");
   $("revCard").hidden=false;$("next").focus();render();
 }
 function advance(){
@@ -1008,7 +1042,7 @@ function fillLearn(q){
 $("learnSearch").oninput=e=>fillLearn(e.target.value);
 $("learnList").addEventListener("click",e=>{const b=e.target.closest("button[data-k]");if(!b)return;const it=P.byKey[b.dataset.k];
   setState(tk(it),"focus");focusOn(it.rep);
-  toast(P.spec.mode==="mc"?cname(it.key):it.ans,it.fact,2600);
+  toast(P.spec.mode==="mc"?cname(it.key):it.ans,[it.fact,partsNote(it.rep)].filter(Boolean).join(" · "),2600);
   setTimeout(()=>setState(tk(it),P.results[it.key]||null),2600)});
 $("learnBtn").onclick=()=>setLearn(!P.learn);
 $("learnGo").onclick=()=>{setLearn(false);if(P.phase==="done")startRound(P.spec.items.map(i=>i.key),0,true)};
