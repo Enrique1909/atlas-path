@@ -601,7 +601,10 @@ const zoom=d3.zoom().scaleExtent([1,4000])
   // a mostly-sideways trackpad swipe spins the globe instead of zooming
   .filter(e=>(!e.ctrlKey||e.type==="wheel")&&!e.button&&!(e.type==="wheel"&&Math.abs(e.deltaX)>Math.abs(e.deltaY)))
   .on("start",()=>{gesture={rot:rotNow,x:lastT.x,moved:false}})
-  .on("end",e=>{if(gesture&&gesture.moved){gesture.moved=false;rememberRot(rotNow)}if(e.sourceEvent)captureUserView()})
+  .on("end",e=>{
+    if(gesture&&gesture.moved){gesture.moved=false;rememberRot(rotNow)}
+    if(e.sourceEvent)userT=d3.zoomTransform(svg.node());  // the user zoomed or moved the map: keep that view
+  })
   .on("zoom",function(e){
     let t=e.transform;
     const se=e.sourceEvent,isPan=se&&/move/.test(se.type)&&Math.abs(t.k-lastT.k)<1e-9;
@@ -629,14 +632,10 @@ function boxT([[x0,y0],[x1,y1]],fill,maxK,cy=H/2){
   return d3.zoomIdentity.translate(W/2,cy).scale(k).translate(-(x0+x1)/2,-(y0+y1)/2);
 }
 const zoomTo=(t,ms=700)=>svg.transition().duration(ms).call(zoom.transform,t);
-/* Once the user zooms in themselves, that view sticks: questions and reveals come back to it, not to the full map.
-   Zooming back out to the starting size (or pressing ⌂) hands control back to the automatic view. */
-let userView=null;
-function captureUserView(){const t=d3.zoomTransform(svg.node());userView=t.k>homeT.k*1.05?{t,rot:rotNow}:null}
-function goHome(ms=600){
-  if(userView){animateRot(userView.rot,ms);zoomTo(userView.t,ms);return}
-  animateRot(rot0,ms);zoomTo(homeT,ms);
-}
+// userT is the view the user last chose by zooming or moving; null means the level's own starting view
+let userT=null;
+function goHome(ms=600){animateRot(rot0,ms);zoomTo(homeT,ms)}
+function restView(ms=600){animateRot(rot0,ms);zoomTo(userT||homeT,ms)}
 function repBounds(rep){
   if(rep.type==="Point"){const p=proj(rep.coordinates);return [[p[0]-1,p[1]-1],[p[0]+1,p[1]+1]]}
   return path.bounds(largestPart(rep));
@@ -662,7 +661,7 @@ function circMeanLon(reps){
 function setState(key,s){root.selectAll("path,circle").filter(d=>d&&d.key===key).attr("data-s",s)}
 
 function drawSpec(sp){
-  svg.interrupt("rot");spinTo=null;userView=null;root.selectAll("*").remove();
+  svg.interrupt("rot");spinTo=null;root.selectAll("*").remove();
   const reps=sp.items.map(i=>i.rep);
   let rot=sp.world?saved.rot:sp.rot!=null?sp.rot:circMeanLon(reps);
   if(sp.home){const c=d3.geoCentroid(largestPart(S.byCode[sp.home]));rot=c[0]}
@@ -720,7 +719,7 @@ function drawSpec(sp){
   // regional maps frame themselves at their natural centre, then apply the user's saved turn for that map
   const savedTurn=sp.world||!P.level?null:saved.levelRot[levelRotKey()];
   if(savedTurn!=null){rot0=rotNow=savedTurn;reproject()}
-  lastT=homeT;svg.call(zoom.transform,homeT);sizeMarks();
+  userT=null;lastT=homeT;svg.call(zoom.transform,homeT);sizeMarks();
 }
 function addCapMark(ll,text){
   const g=root.select("g.labels");
@@ -792,7 +791,7 @@ function startRound(keys,limit,full){
   P.byKey=Object.fromEntries(P.spec.items.map(i=>[i.key,i]));
   root.selectAll(".el").attr("data-s",null);root.select("g.labels").selectAll("*").remove();
   $("over").hidden=true;$("revCard").hidden=true;
-  goHome(400);ask();
+  restView(400);ask();
 }
 const cur=()=>P.byKey[P.queue[P.idx]];
 const tk=it=>it.tkey||it.key;
@@ -933,7 +932,7 @@ function advance(){
   if(P.spec.mode==="type")root.select("g.labels").selectAll("*").remove();
   P.idx++;
   if(P.idx>=P.queue.length){finish();return}
-  if(P.spec.mode==="click")goHome(500);
+  if(P.spec.mode==="click")restView(500);
   ask();
 }
 function finish(){
@@ -976,9 +975,10 @@ $("nextLevel").onclick=()=>{const n=nextLevelOf(P.level.id);if(n)openLevel(n,"qu
 const skipQ=()=>{if(P.phase!=="ask"||P.learn)return;if(P.spec.mode==="type")flashAnswer("",true);else reveal("Skipped")};
 $("skip").onclick=skipQ;
 $("next").onclick=advance;
-$("zin").onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,1.6).on("end",captureUserView);
-$("zout").onclick=()=>svg.transition().duration(300).call(zoom.scaleBy,1/1.6).on("end",captureUserView);
-$("zhome").onclick=()=>{userView=null;goHome(500)};
+const zoomByButton=f=>svg.transition().duration(300).call(zoom.scaleBy,f).on("end",()=>{userT=d3.zoomTransform(svg.node())});
+$("zin").onclick=()=>zoomByButton(1.6);
+$("zout").onclick=()=>zoomByButton(1/1.6);
+$("zhome").onclick=()=>{userT=null;goHome(500)};
 $("spinL").onclick=()=>spinUser(-30,400);
 $("spinR").onclick=()=>spinUser(30,400);
 
